@@ -161,37 +161,22 @@
       .field-label { font-size: 12px; }
     }
 
-    /* 印刷・PDF用 */
+    /* 印刷用レイアウト：画面では非表示、印刷時のみ表示 */
+    #pdfSource { display: none; }
+
     @media print {
-      body { background: white; padding: 0; }
-      .no-print { display: none !important; }
-      .section-card {
-        box-shadow: none;
-        border: 1px solid #E5E7EB;
-        page-break-inside: avoid;
-        margin-bottom: 10px;
-        border-radius: 8px;
+      body { background: white; padding: 0; margin: 0; }
+      .container { display: none !important; }
+      #pdfSource {
+        display: block !important;
+        width: 100%;
+        padding: 0;
+        font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Meiryo', sans-serif;
+        color: #1F2937;
       }
-      .header { padding: 16px 0 12px; }
-      .field-input, .extra-label-input {
-        border: 1px solid #D1D5DB;
-        background: white;
-      }
-      .field-spacer, .btn-delete { display: none; }
-      .field-row { grid-template-columns: 110px 1fr; }
     }
 
-    /* PDF生成用の隠しコンテナ */
-    #pdfSource {
-      position: fixed;
-      left: -9999px;
-      top: 0;
-      width: 720px;
-      background: #fff;
-      padding: 40px 44px;
-      font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Meiryo', sans-serif;
-      color: #1F2937;
-    }
+    /* 印刷内容のスタイル */
     #pdfSource .pdf-title { font-size: 26px; font-weight: 800; margin-bottom: 4px; }
     #pdfSource .pdf-date { font-size: 13px; color: #6B7280; margin-bottom: 24px; }
     #pdfSource .pdf-section { margin-bottom: 22px; page-break-inside: avoid; }
@@ -213,8 +198,6 @@
     /* ボタンのローディング状態 */
     .btn-pdf:disabled { opacity: 0.6; cursor: wait; }
   </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 <div class="container">
@@ -228,7 +211,8 @@
 
   <div class="notice no-print">
     💡 入力内容はこのブラウザにだけ保存されます。サーバーには何も送信されません。<br>
-    「PDFで保存する」で自分のスマホ・PCにPDF保存できます。
+    「印刷・PDFで保存する」を押すと印刷プレビューが開きます。<br>
+    プレビュー画面で印刷先を「<b>PDFに保存</b>」に選ぶと、PDFとして保存できます。
   </div>
 
   <!-- 👤 基本情報 -->
@@ -283,7 +267,7 @@
 
   <!-- 保存 -->
   <div class="actions no-print">
-    <button class="btn-pdf" onclick="savePDF()">📄 PDFで保存する</button>
+    <button class="btn-pdf" onclick="savePDF()">🖨️ 印刷・PDFで保存する</button>
     <div class="save-status" id="saveStatus">準備中...</div>
   </div>
 
@@ -444,12 +428,12 @@ function setStatus(state) {
   else { el.textContent = '前回の入力を読み込みました'; el.className = 'save-status saved'; }
 }
 
-/* ---------- PDF保存（スマホ対応・jsPDF + html2canvas） ---------- */
+/* ---------- 印刷・PDF保存（印刷プレビュー方式・LINEブラウザ対応） ---------- */
 function escapeHtml(s) {
   return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function buildPdfSource() {
+function buildPrintSource() {
   const now = new Date();
   const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 作成`;
 
@@ -491,53 +475,11 @@ function buildPdfSource() {
   return src;
 }
 
-async function savePDF() {
+function savePDF() {
   saveData();
-  const btn = document.querySelector('.btn-pdf');
-  const originalText = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = '📄 PDFを作成中...';
-
-  try {
-    const source = buildPdfSource();
-
-    const canvas = await html2canvas(source, {
-      scale: 2,
-      backgroundColor: '#ffffff',
-      useCORS: true
-    });
-
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pageW = pdf.internal.pageSize.getWidth();   // 210mm
-    const pageH = pdf.internal.pageSize.getHeight();  // 297mm
-    const margin = 10;
-    const imgW = pageW - margin * 2;
-    const imgH = (canvas.height * imgW) / canvas.width;
-
-    const imgData = canvas.toDataURL('image/jpeg', 0.92);
-
-    // 高さがA4を超える場合は複数ページに分割
-    let heightLeft = imgH;
-    let position = margin;
-    pdf.addImage(imgData, 'JPEG', margin, position, imgW, imgH);
-    heightLeft -= (pageH - margin * 2);
-
-    while (heightLeft > 0) {
-      position = margin - (imgH - heightLeft);
-      pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', margin, position, imgW, imgH);
-      heightLeft -= (pageH - margin * 2);
-    }
-
-    pdf.save('エンディングノート.pdf');
-  } catch (e) {
-    alert('PDFの作成に失敗しました。通信環境を確認してもう一度お試しください。');
-    console.error(e);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = originalText;
-  }
+  buildPrintSource();
+  // 印刷プレビューを開く（プレビューから「PDFで保存」を選べる）
+  window.print();
 }
 
 init();
