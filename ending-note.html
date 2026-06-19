@@ -180,7 +180,41 @@
       .field-spacer, .btn-delete { display: none; }
       .field-row { grid-template-columns: 110px 1fr; }
     }
+
+    /* PDF生成用の隠しコンテナ */
+    #pdfSource {
+      position: fixed;
+      left: -9999px;
+      top: 0;
+      width: 720px;
+      background: #fff;
+      padding: 40px 44px;
+      font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Meiryo', sans-serif;
+      color: #1F2937;
+    }
+    #pdfSource .pdf-title { font-size: 26px; font-weight: 800; margin-bottom: 4px; }
+    #pdfSource .pdf-date { font-size: 13px; color: #6B7280; margin-bottom: 24px; }
+    #pdfSource .pdf-section { margin-bottom: 22px; page-break-inside: avoid; }
+    #pdfSource .pdf-section-title {
+      font-size: 18px; font-weight: 800; color: #B45309;
+      border-bottom: 2px solid #F59E0B;
+      padding-bottom: 6px; margin-bottom: 12px;
+    }
+    #pdfSource .pdf-field { margin-bottom: 11px; }
+    #pdfSource .pdf-field-label { font-size: 13px; font-weight: 700; color: #4B5563; margin-bottom: 3px; }
+    #pdfSource .pdf-field-value {
+      font-size: 14px; color: #1F2937; line-height: 1.6;
+      white-space: pre-wrap;
+      border-bottom: 1px solid #E5E7EB;
+      min-height: 20px; padding-bottom: 4px;
+    }
+    #pdfSource .pdf-empty { color: #C7CDD6; }
+
+    /* ボタンのローディング状態 */
+    .btn-pdf:disabled { opacity: 0.6; cursor: wait; }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 <div class="container">
@@ -259,6 +293,9 @@
 
 </div>
 
+<!-- PDF生成用（画面には表示されない） -->
+<div id="pdfSource"></div>
+
 <script>
 const SECTIONS = {
   basic: [
@@ -295,6 +332,14 @@ const SECTIONS = {
     { id: 'digital-securities',   label: '証券会社ログイン', placeholder: '会社名・ログインID・パスワード' },
     { id: 'digital-subscription', label: '定期・サブスク',   placeholder: 'サービス名・金額・解約方法' }
   ]
+};
+
+const SECTION_TITLES = {
+  basic:   '👤 基本情報',
+  family:  '👨‍👩‍👧 家族',
+  assets:  '💰 財産',
+  medical: '🏥 医療',
+  digital: '💻 デジタル'
 };
 
 const STORAGE_KEY = 'ending-note-v1';
@@ -399,7 +444,101 @@ function setStatus(state) {
   else { el.textContent = '前回の入力を読み込みました'; el.className = 'save-status saved'; }
 }
 
-function savePDF() { saveData(); window.print(); }
+/* ---------- PDF保存（スマホ対応・jsPDF + html2canvas） ---------- */
+function escapeHtml(s) {
+  return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function buildPdfSource() {
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 作成`;
+
+  let html = `<div class="pdf-title">📝 エンディングノート</div>`;
+  html += `<div class="pdf-date">${dateStr}</div>`;
+
+  Object.keys(SECTIONS).forEach(sid => {
+    const rows = [];
+
+    // 標準項目
+    SECTIONS[sid].forEach(f => {
+      const el = document.querySelector(`[data-fid="${f.id}"]`);
+      rows.push({ label: f.label, value: el ? el.value : '' });
+    });
+    // 追加項目
+    document.querySelectorAll(`#fields-${sid} .extra-row`).forEach(r => {
+      rows.push({
+        label: r.querySelector('input')?.value || '（項目名なし）',
+        value: r.querySelector('textarea')?.value || ''
+      });
+    });
+
+    let fieldsHtml = '';
+    rows.forEach(row => {
+      const val = row.value && row.value.trim()
+        ? `<div class="pdf-field-value">${escapeHtml(row.value)}</div>`
+        : `<div class="pdf-field-value pdf-empty">（未記入）</div>`;
+      fieldsHtml += `<div class="pdf-field"><div class="pdf-field-label">${escapeHtml(row.label)}</div>${val}</div>`;
+    });
+
+    html += `<div class="pdf-section">
+      <div class="pdf-section-title">${SECTION_TITLES[sid]}</div>
+      ${fieldsHtml}
+    </div>`;
+  });
+
+  const src = document.getElementById('pdfSource');
+  src.innerHTML = html;
+  return src;
+}
+
+async function savePDF() {
+  saveData();
+  const btn = document.querySelector('.btn-pdf');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '📄 PDFを作成中...';
+
+  try {
+    const source = buildPdfSource();
+
+    const canvas = await html2canvas(source, {
+      scale: 2,
+      backgroundColor: '#ffffff',
+      useCORS: true
+    });
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageW = pdf.internal.pageSize.getWidth();   // 210mm
+    const pageH = pdf.internal.pageSize.getHeight();  // 297mm
+    const margin = 10;
+    const imgW = pageW - margin * 2;
+    const imgH = (canvas.height * imgW) / canvas.width;
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.92);
+
+    // 高さがA4を超える場合は複数ページに分割
+    let heightLeft = imgH;
+    let position = margin;
+    pdf.addImage(imgData, 'JPEG', margin, position, imgW, imgH);
+    heightLeft -= (pageH - margin * 2);
+
+    while (heightLeft > 0) {
+      position = margin - (imgH - heightLeft);
+      pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', margin, position, imgW, imgH);
+      heightLeft -= (pageH - margin * 2);
+    }
+
+    pdf.save('エンディングノート.pdf');
+  } catch (e) {
+    alert('PDFの作成に失敗しました。通信環境を確認してもう一度お試しください。');
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
 
 init();
 </script>
