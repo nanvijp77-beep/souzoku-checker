@@ -264,6 +264,90 @@
             box-shadow: 0 6px 18px rgba(245,158,11,0.45);
         }
 
+        /* ポップアップ（モーダル） */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(31,41,55,0.55);
+            z-index: 1000;
+            padding: 20px 16px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .modal-overlay.open {
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+        }
+        .modal {
+            background: white;
+            border-radius: 20px;
+            max-width: 440px;
+            width: 100%;
+            margin: auto;
+            padding: 28px 24px 24px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+            animation: modalIn 0.28s ease forwards;
+        }
+        @keyframes modalIn {
+            from { opacity: 0; transform: translateY(16px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .modal-title {
+            font-size: 19px;
+            font-weight: 800;
+            color: #1F2937;
+            text-align: center;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+        .modal-block {
+            background: #F9FAFB;
+            border-radius: 14px;
+            padding: 16px 16px;
+            margin-bottom: 14px;
+        }
+        .modal-block.privacy { background: #ECFDF5; }
+        .modal-block.line-warn { background: #FFFBEB; }
+        .modal-block h3 {
+            font-size: 14px;
+            font-weight: 700;
+            color: #1F2937;
+            margin-bottom: 8px;
+        }
+        .modal-block p {
+            font-size: 13.5px;
+            color: #4B5563;
+            line-height: 1.7;
+        }
+        .modal-warn-strong {
+            color: #DC2626;
+            font-weight: 700;
+        }
+        .modal-step {
+            font-size: 13.5px;
+            color: #374151;
+            line-height: 1.7;
+            margin-top: 10px;
+        }
+        .modal-step b { color: #1F2937; }
+        .btn-modal-go {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #F59E0B, #EF6C00);
+            color: white;
+            border: none;
+            border-radius: 14px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 8px;
+            box-shadow: 0 4px 14px rgba(245,158,11,0.38);
+            transition: opacity 0.18s, transform 0.18s;
+        }
+        .btn-modal-go:hover { opacity: 0.92; transform: translateY(-2px); }
+
         /* フッター */
         .footer {
             text-align: center;
@@ -306,6 +390,36 @@
 
     <div class="footer">
         このチェッカーは一般的な情報提供を目的としたもので、<br>個別の法的アドバイスではありません。
+    </div>
+</div>
+
+<!-- エンディングノート開始前のポップアップ -->
+<div class="modal-overlay" id="endingModal" onclick="overlayClose(event)">
+    <div class="modal">
+        <div class="modal-title">📝 エンディングノートを<br>始める前に</div>
+
+        <div class="modal-block privacy">
+            <h3>🔒 プライバシーについて</h3>
+            <p>入力した内容はあなたのスマホ・PCの中にだけ保存されます。インターネットには出ていきません。誰にも見えません😊</p>
+        </div>
+
+        <div class="modal-block line-warn">
+            <h3>⚠️ LINEで開いている方へ</h3>
+            <p><span class="modal-warn-strong">そのまま入力すると保存されません！</span></p>
+            <div class="modal-step">
+                📱 <b>Androidの方</b><br>
+                右上「⋮」→「デフォルトのブラウザで開く」
+            </div>
+            <div class="modal-step">
+                🍎 <b>iPhoneの方</b><br>
+                右下「・・・」→「ブラウザで開く」
+            </div>
+            <div class="modal-step">
+                を押してから入力してください。
+            </div>
+        </div>
+
+        <button class="btn-modal-go" onclick="goEndingNote()">わかった！書いてみる</button>
     </div>
 </div>
 
@@ -467,7 +581,7 @@ function showResult() {
                 </div>
             `).join('')}
         </div>
-        <a href="ending-note.html" class="btn-ending-note">📝 エンディングノートを書いてみる</a>
+        <button class="btn-ending-note" onclick="openEndingModal()">📝 エンディングノートを書いてみる</button>
         <button class="btn-retry" onclick="restart()">もう一度チェックする</button>
     `;
     card.style.display = 'block';
@@ -480,6 +594,21 @@ function restart() {
     document.getElementById('quizArea').style.display = 'block';
     document.getElementById('resultCard').style.display = 'none';
     render();
+}
+
+/* エンディングノート開始前ポップアップ */
+function openEndingModal() {
+    document.getElementById('endingModal').classList.add('open');
+}
+function closeEndingModal() {
+    document.getElementById('endingModal').classList.remove('open');
+}
+function overlayClose(e) {
+    // 背景（オーバーレイ）をタップした時だけ閉じる
+    if (e.target === e.currentTarget) closeEndingModal();
+}
+function goEndingNote() {
+    window.location.href = 'ending-note.html';
 }
 
 render();
