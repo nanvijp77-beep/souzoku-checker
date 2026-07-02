@@ -42,6 +42,12 @@
             color: #6B7280;
             line-height: 1.7;
         }
+        .header .trust {
+            font-size: 12px;
+            color: #9CA3AF;
+            line-height: 1.6;
+            margin-top: 10px;
+        }
 
         /* プログレスバー */
         .progress-wrap { margin-bottom: 24px; }
@@ -196,6 +202,23 @@
             line-height: 1.75;
             margin-bottom: 24px;
         }
+
+        .next-step {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-align: left;
+            background: #FFFBF0;
+            border: 1.5px solid #FDE68A;
+            border-radius: 13px;
+            padding: 14px 16px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #92400E;
+            line-height: 1.5;
+        }
+        .next-step .ns-icon { flex-shrink: 0; font-size: 18px; }
 
         /* アドバイスリスト */
         .advice-box {
@@ -372,6 +395,7 @@
         <span class="icon">📋</span>
         <h1>相続かんたんチェッカー</h1>
         <p>4つの質問に答えるだけで、<br>あなたの「今必要なこと」がわかります。</p>
+        <p class="trust">入力内容はどこにも送信されません。<br>このスマホの中だけで動きます。</p>
     </div>
 
     <div class="progress-wrap" id="progressWrap">
@@ -470,6 +494,7 @@ const RESULTS = {
         icon: '🔔',
         title: '今すぐ動き始めましょう',
         desc: '状況からみて、相続に関わる準備が急がれます。「難しそう」と感じていても、まず一歩だけ動くことが大切です。小さく始めて、少しずつ整理していきましょう。',
+        nextStep: 'まずは戸籍謄本の確認から始めましょう',
         advice: [
             { icon: '🗂️', text: '親の財産・通帳・保険などをリストアップする' },
             { icon: '👨‍👩‍👧', text: '家族で「もしもの時」の話し合いの場をつくる' },
@@ -483,6 +508,7 @@ const RESULTS = {
         icon: '🌤️',
         title: 'そろそろ動き出す時期です',
         desc: 'まだ余裕はありますが、早めに準備しておくと「もしもの時」に慌てずに済みます。焦らず、できることから少しずつ進めましょう。',
+        nextStep: 'エンディングノートを書いてみるのがおすすめです',
         advice: [
             { icon: '💬', text: '親御さんと財産や将来のことを少しずつ話してみる' },
             { icon: '📄', text: '自分のエンディングノートをつけ始める' },
@@ -496,6 +522,7 @@ const RESULTS = {
         icon: '🌟',
         title: 'とても良い準備ができています',
         desc: 'しっかり備えができています。あとは定期的に見直しをするだけで、ずっと安心な状態を保てます。このまま続けましょう。',
+        nextStep: '今のうちにエンディングノートで情報を整理しておきましょう',
         advice: [
             { icon: '🔄', text: '財産・家族状況が変わったら内容を見直す' },
             { icon: '📅', text: '遺言書は年に一度確認・更新が理想的' },
@@ -572,6 +599,10 @@ function showResult() {
         <div class="result-badge ${r.badgeClass}">${r.badge}</div>
         <h2 class="result-title">${r.title}</h2>
         <p class="result-desc">${r.desc}</p>
+        <div class="next-step">
+            <span class="ns-icon">👉</span>
+            <span>次の一歩：${r.nextStep}</span>
+        </div>
         <div class="advice-box">
             <h3>▶ あなたへのアドバイス</h3>
             ${r.advice.map(a => `
