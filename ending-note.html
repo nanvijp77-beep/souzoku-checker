@@ -161,24 +161,21 @@
       .field-label { font-size: 12px; }
     }
 
-    /* 印刷用レイアウト：画面では非表示、印刷時のみ表示 */
-    #pdfSource { display: none; }
-
-    @media print {
-      body { background: white; padding: 0; margin: 0; }
-      .container { display: none !important; }
-      #pdfSource {
-        display: block !important;
-        width: 100%;
-        padding: 0;
-        font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Meiryo', sans-serif;
-        color: #1F2937;
-      }
+    /* PDF生成用の隠しコンテナ（画面外に配置してhtml2canvasで撮影する） */
+    #pdfSource {
+      position: absolute;
+      top: 0;
+      left: -9999px;
+      width: 760px;
+      background: #fff;
+      padding: 40px 44px;
+      font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Meiryo', sans-serif;
+      color: #1F2937;
     }
 
-    /* 印刷内容のスタイル（スマホでも見やすいよう大きめ） */
-    #pdfSource .pdf-title { font-size: 34px; font-weight: 800; margin-bottom: 6px; }
-    #pdfSource .pdf-date { font-size: 18px; color: #6B7280; margin-bottom: 28px; }
+    /* PDF内容のスタイル */
+    #pdfSource .pdf-title { font-size: 30px; font-weight: 800; margin-bottom: 6px; }
+    #pdfSource .pdf-date { font-size: 15px; color: #6B7280; margin-bottom: 26px; }
     #pdfSource .pdf-section { margin-bottom: 28px; page-break-inside: avoid; }
     #pdfSource .pdf-section-title {
       font-size: 26px; font-weight: 800; color: #B45309;
@@ -197,7 +194,24 @@
 
     /* ボタンのローディング状態 */
     .btn-pdf:disabled { opacity: 0.6; cursor: wait; }
+
+    /* LINEアプリ内ブラウザ警告 */
+    .line-warning {
+      display: none;
+      background: #FFFBEB;
+      border-left: 4px solid #F59E0B;
+      border-radius: 0 12px 12px 0;
+      padding: 14px 16px;
+      font-size: 13px;
+      color: #4B5563;
+      line-height: 1.8;
+      margin-bottom: 20px;
+    }
+    .line-warning b { color: #1F2937; }
+    .line-warning .warn-strong { color: #DC2626; font-weight: 700; }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 <div class="container">
@@ -209,10 +223,18 @@
     <a href="index.html" class="back-link no-print">← 相続チェッカーに戻る</a>
   </div>
 
+  <div class="line-warning no-print" id="lineWarning">
+    ⚠️ <span class="warn-strong">LINEのアプリ内で開いています</span><br>
+    このままだとPDFの保存がうまくいかないことがあります。<br>
+    <b>📱 Android</b>：右上「⋮」→「デフォルトのブラウザで開く」<br>
+    <b>🍎 iPhone</b>：共有アイコン（四角に↑の矢印）→「Safariで開く」<br>
+    見つからない場合は、この画面のURLを長押しでコピーして、Safariアプリを開いてURL欄に貼り付けてください。<br>
+    やってから入力・保存してください。
+  </div>
+
   <div class="notice no-print">
     💡 入力内容はこのブラウザにだけ保存されます。サーバーには何も送信されません。<br>
-    「印刷・PDFで保存する」を押すと印刷プレビューが開きます。<br>
-    プレビュー画面で印刷先を「<b>PDFに保存</b>」に選ぶと、PDFとして保存できます。
+    「PDFをダウンロードする」を押すと、そのままPDFファイルが保存されます。
   </div>
 
   <!-- 👤 基本情報 -->
@@ -267,7 +289,7 @@
 
   <!-- 保存 -->
   <div class="actions no-print">
-    <button class="btn-pdf" onclick="savePDF()">🖨️ 印刷・PDFで保存する</button>
+    <button class="btn-pdf" id="btnPdf" onclick="savePDF()">📥 PDFをダウンロードする</button>
     <div class="save-status" id="saveStatus">準備中...</div>
   </div>
 
@@ -329,7 +351,14 @@ const SECTION_TITLES = {
 const STORAGE_KEY = 'ending-note-v1';
 let saveTimer = null;
 
+function isLineBrowser() {
+  return /\bLine\//i.test(navigator.userAgent);
+}
+
 function init() {
+  if (isLineBrowser()) {
+    document.getElementById('lineWarning').style.display = 'block';
+  }
   const saved = loadData();
   Object.entries(SECTIONS).forEach(([sid, fields]) => {
     const container = document.getElementById('fields-' + sid);
@@ -425,15 +454,18 @@ function setStatus(state) {
   const el = document.getElementById('saveStatus');
   if (state === 'saving') { el.textContent = '保存中...'; el.className = 'save-status'; }
   else if (state === 'saved') { el.textContent = '✅ 自動保存されました'; el.className = 'save-status saved'; }
+  else if (state === 'generating') { el.textContent = '📄 PDFを作成中...'; el.className = 'save-status'; }
+  else if (state === 'downloaded') { el.textContent = '✅ PDFをダウンロードしました'; el.className = 'save-status saved'; }
+  else if (state === 'error') { el.textContent = '⚠️ PDFの作成に失敗しました。もう一度お試しください'; el.className = 'save-status'; }
   else { el.textContent = '前回の入力を読み込みました'; el.className = 'save-status saved'; }
 }
 
-/* ---------- 印刷・PDF保存（印刷プレビュー方式・LINEブラウザ対応） ---------- */
+/* ---------- PDF保存（jsPDF + html2canvas・直接ダウンロード方式） ---------- */
 function escapeHtml(s) {
   return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function buildPrintSource() {
+function buildPdfSource() {
   const now = new Date();
   const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 作成`;
 
@@ -475,11 +507,66 @@ function buildPrintSource() {
   return src;
 }
 
-function savePDF() {
+async function savePDF() {
   saveData();
-  buildPrintSource();
-  // 印刷プレビューを開く（プレビューから「PDFで保存」を選べる）
-  window.print();
+
+  if (isLineBrowser()) {
+    const ok = confirm(
+      'LINEのアプリ内ブラウザで開いています。\n' +
+      'このまま作成しても保存できないことがあります。\n\n' +
+      'Android：右上「⋮」→「デフォルトのブラウザで開く」\n' +
+      'iPhone：共有アイコン→「Safariで開く」\n' +
+      '（見つからなければURLを長押しでコピー→Safariに貼り付け）\n\n' +
+      'このまま作成を試しますか？'
+    );
+    if (!ok) return;
+  }
+
+  const btn = document.getElementById('btnPdf');
+  btn.disabled = true;
+  setStatus('generating');
+
+  try {
+    const source = buildPdfSource();
+
+    const canvas = await html2canvas(source, {
+      scale: 2,
+      backgroundColor: '#ffffff',
+      useCORS: true
+    });
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const imgWidth = pageWidth;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+    let heightLeft = imgHeight;
+    let position = 0;
+
+    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+
+    while (heightLeft > 0) {
+      position -= pageHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+    }
+
+    const now = new Date();
+    const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    pdf.save(`エンディングノート_${stamp}.pdf`);
+    setStatus('downloaded');
+  } catch (err) {
+    console.error(err);
+    setStatus('error');
+    alert('PDFの作成に失敗しました。もう一度お試しください。');
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 init();
