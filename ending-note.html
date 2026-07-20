@@ -67,6 +67,10 @@
     }
     .section-icon { font-size: 24px; }
     .section-title { font-size: 17px; font-weight: 800; color: #1F2937; }
+    .section-hint {
+      font-size: 12px; color: #9CA3AF; line-height: 1.7;
+      margin-bottom: 12px;
+    }
 
     /* フィールド行 */
     .field-row {
@@ -287,6 +291,37 @@
     <button class="btn-add no-print" onclick="addField('digital')">＋ 項目を追加する</button>
   </div>
 
+  <!-- 🕊️ 葬式・お別れ -->
+  <div class="section-card">
+    <div class="section-header">
+      <span class="section-icon">🕊️</span>
+      <span class="section-title">葬式・お別れ</span>
+    </div>
+    <div class="fields" id="fields-sougi"></div>
+    <button class="btn-add no-print" onclick="addField('sougi')">＋ 項目を追加する</button>
+  </div>
+
+  <!-- 🤲 介護 -->
+  <div class="section-card">
+    <div class="section-header">
+      <span class="section-icon">🤲</span>
+      <span class="section-title">介護</span>
+    </div>
+    <div class="fields" id="fields-kaigo"></div>
+    <button class="btn-add no-print" onclick="addField('kaigo')">＋ 項目を追加する</button>
+  </div>
+
+  <!-- 💌 大切な人へ -->
+  <div class="section-card">
+    <div class="section-header">
+      <span class="section-icon">💌</span>
+      <span class="section-title">大切な人へ</span>
+    </div>
+    <p class="section-hint no-print">下の「＋項目を追加する」で、項目名に相手の名前（例：長女〇〇へ）を入れると、一人ずつメッセージを残せます。</p>
+    <div class="fields" id="fields-message"></div>
+    <button class="btn-add no-print" onclick="addField('message')">＋ 項目を追加する</button>
+  </div>
+
   <!-- 保存 -->
   <div class="actions no-print">
     <button class="btn-pdf" id="btnPdf" onclick="savePDF()">📥 PDFをダウンロードする</button>
@@ -337,6 +372,23 @@ const SECTIONS = {
     { id: 'digital-paypay',       label: 'PayPay',           placeholder: '登録電話番号・暗証番号' },
     { id: 'digital-securities',   label: '証券会社ログイン', placeholder: '会社名・ログインID・パスワード' },
     { id: 'digital-subscription', label: '定期・サブスク',   placeholder: 'サービス名・金額・解約方法' }
+  ],
+  sougi: [
+    { id: 'sougi-style',    label: '形式の希望',   placeholder: '例：家族葬・一般葬・直葬など' },
+    { id: 'sougi-religion', label: '宗教・宗派',   placeholder: '例：仏教（〇〇宗）・神道・無宗教など' },
+    { id: 'sougi-place',    label: '希望の場所',   placeholder: '例：〇〇斎場・自宅など' },
+    { id: 'sougi-guests',   label: '呼んでほしい人・呼ばなくていい人', placeholder: '名前・続柄など自由に' },
+    { id: 'sougi-music',    label: '音楽・花の希望', placeholder: '例：流してほしい曲、好きな花' },
+    { id: 'sougi-budget',   label: '予算感',       placeholder: '例：〇〇万円くらい・互助会加入あり など' }
+  ],
+  kaigo: [
+    { id: 'kaigo-style',    label: '希望する介護の形', placeholder: '例：できれば在宅・施設でもよい など' },
+    { id: 'kaigo-facility', label: '希望する施設',     placeholder: 'あれば施設名・場所' },
+    { id: 'kaigo-person',   label: 'お願いしたい人',   placeholder: '名前・続柄' },
+    { id: 'kaigo-money',    label: '費用の準備状況',   placeholder: '例：介護保険・貯蓄・民間保険 など' }
+  ],
+  message: [
+    { id: 'message-family', label: '家族への一言メッセージ', placeholder: '感謝の気持ちなど、自由に' }
   ]
 };
 
@@ -345,7 +397,10 @@ const SECTION_TITLES = {
   family:  '👨‍👩‍👧 家族',
   assets:  '💰 財産',
   medical: '🏥 医療',
-  digital: '💻 デジタル'
+  digital: '💻 デジタル',
+  sougi:   '🕊️ 葬式・お別れ',
+  kaigo:   '🤲 介護',
+  message: '💌 大切な人へ'
 };
 
 const STORAGE_KEY = 'ending-note-v1';
@@ -467,46 +522,58 @@ function escapeHtml(s) {
   return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function buildPdfSource() {
-  const now = new Date();
-  const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 作成`;
+function buildSectionHtml(sid) {
+  const rows = [];
 
-  let html = `<div class="pdf-title">📝 エンディングノート</div>`;
-  html += `<div class="pdf-date">${dateStr}</div>`;
-
-  Object.keys(SECTIONS).forEach(sid => {
-    const rows = [];
-
-    // 標準項目
-    SECTIONS[sid].forEach(f => {
-      const el = document.querySelector(`[data-fid="${f.id}"]`);
-      rows.push({ label: f.label, value: el ? el.value : '' });
+  // 標準項目
+  SECTIONS[sid].forEach(f => {
+    const el = document.querySelector(`[data-fid="${f.id}"]`);
+    rows.push({ label: f.label, value: el ? el.value : '' });
+  });
+  // 追加項目
+  document.querySelectorAll(`#fields-${sid} .extra-row`).forEach(r => {
+    rows.push({
+      label: r.querySelector('input')?.value || '（項目名なし）',
+      value: r.querySelector('textarea')?.value || ''
     });
-    // 追加項目
-    document.querySelectorAll(`#fields-${sid} .extra-row`).forEach(r => {
-      rows.push({
-        label: r.querySelector('input')?.value || '（項目名なし）',
-        value: r.querySelector('textarea')?.value || ''
-      });
-    });
-
-    let fieldsHtml = '';
-    rows.forEach(row => {
-      const val = row.value && row.value.trim()
-        ? `<div class="pdf-field-value">${escapeHtml(row.value)}</div>`
-        : `<div class="pdf-field-value pdf-empty">（未記入）</div>`;
-      fieldsHtml += `<div class="pdf-field"><div class="pdf-field-label">${escapeHtml(row.label)}</div>${val}</div>`;
-    });
-
-    html += `<div class="pdf-section">
-      <div class="pdf-section-title">${SECTION_TITLES[sid]}</div>
-      ${fieldsHtml}
-    </div>`;
   });
 
-  const src = document.getElementById('pdfSource');
-  src.innerHTML = html;
-  return src;
+  let fieldsHtml = '';
+  rows.forEach(row => {
+    const val = row.value && row.value.trim()
+      ? `<div class="pdf-field-value">${escapeHtml(row.value)}</div>`
+      : `<div class="pdf-field-value pdf-empty">（未記入）</div>`;
+    fieldsHtml += `<div class="pdf-field"><div class="pdf-field-label">${escapeHtml(row.label)}</div>${val}</div>`;
+  });
+
+  return `<div class="pdf-section">
+    <div class="pdf-section-title">${SECTION_TITLES[sid]}</div>
+    ${fieldsHtml}
+  </div>`;
+}
+
+// 1ページ＝1セクション。canvasを1ページずつPDFに追加する
+// （セクションが1ページに収まらない場合は続きが次ページに送られる）
+function addCanvasToPdf(pdf, canvas, isFirstPage) {
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const imgWidth = pageWidth;
+  const imgHeight = (canvas.height * imgWidth) / canvas.width;
+  const imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+  let heightLeft = imgHeight;
+  let position = 0;
+
+  if (!isFirstPage) pdf.addPage();
+  pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+  heightLeft -= pageHeight;
+
+  while (heightLeft > 0) {
+    position -= pageHeight;
+    pdf.addPage();
+    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+  }
 }
 
 async function savePDF() {
@@ -529,36 +596,31 @@ async function savePDF() {
   setStatus('generating');
 
   try {
-    const source = buildPdfSource();
-
-    const canvas = await html2canvas(source, {
-      scale: 2,
-      backgroundColor: '#ffffff',
-      useCORS: true
-    });
-
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF('p', 'mm', 'a4');
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const imgWidth = pageWidth;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
-
-    let heightLeft = imgHeight;
-    let position = 0;
-
-    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
-
-    while (heightLeft > 0) {
-      position -= pageHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-    }
-
+    const src = document.getElementById('pdfSource');
+    const sids = Object.keys(SECTIONS);
     const now = new Date();
+    const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 作成`;
+
+    for (let i = 0; i < sids.length; i++) {
+      let html = '';
+      if (i === 0) {
+        html += `<div class="pdf-title">📝 エンディングノート</div>`;
+        html += `<div class="pdf-date">${dateStr}</div>`;
+      }
+      html += buildSectionHtml(sids[i]);
+      src.innerHTML = html;
+
+      const canvas = await html2canvas(src, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        useCORS: true
+      });
+      addCanvasToPdf(pdf, canvas, i === 0);
+    }
+    src.innerHTML = '';
+
     const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
     pdf.save(`エンディングノート_${stamp}.pdf`);
     setStatus('downloaded');
