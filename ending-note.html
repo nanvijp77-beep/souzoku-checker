@@ -3,6 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- 入力内容が外部に持ち出されないようにする防御。
+       connect-src 'none' で通信を全面禁止、form-action 'none' で送信も禁止。
+       このページは自前ファイルだけで完結するため、外部読み込みも許可しない。 -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'">
   <title>エンディングノート｜大切な情報を残しておこう</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -214,8 +218,10 @@
     .line-warning b { color: #1F2937; }
     .line-warning .warn-strong { color: #DC2626; font-weight: 700; }
   </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- PDF生成ライブラリは自前で同梱（外部CDNに依存しない＝配布元が改ざんされても影響を受けない）
+       html2canvas 1.4.1 / jsPDF 2.5.1 — cdnjs公開のSHA-512と一致を確認済み（2026-07-27） -->
+  <script src="lib/html2canvas.min.js"></script>
+  <script src="lib/jspdf.umd.min.js"></script>
 </head>
 <body>
 <div class="container">
